@@ -1,0 +1,8 @@
+Name,Type,Location,Size,SectionID,IsGlobal
+main,label,-1,-1,-1,true
+test,external,-1,-1,-1,false
+X,var,0,44,1,false
+sum,var,44,8,1,false
+L1,label,15,-1,2,false
+JMP,var,30,4,2,false
+L2,label,34,-1,2,false

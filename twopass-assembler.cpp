@@ -8,126 +8,108 @@
 
 using namespace std;
 
-string toString(int i){
-    stringstream ss;
-    ss << i;
-    return ss.str();
-}
+void init();
+void input(string file="");
+void output();
+void pass1();
+void pass2();
 
-string toHex(int i){
-    stringstream ss;
-    ss << hex << i;
-    string s = ss.str();
-    if(s.size()==1) s="0"+s;
-    return s;
-}
 
-string toHex(int i, int bytes){
-  if(bytes==0) bytes=1;
-  //cout<<"got i , bytes : "<<i<<" "<<bytes<<endl;
-    stringstream ss;
-    ss << hex << i;
-    string s = ss.str();
-    while(s.length()!=2*bytes)
-      s="0"+s;
-    return s;
-}
-
-string toBin(string hex){
-  string binary="";
-
-  for(int i=0; i<hex.size(); i++){
-        switch (hex[i]) {
-          case '0': binary+="0000"; break;
-          case '1': binary+="0001"; break;
-          case '2': binary+="0010"; break;
-          case '3': binary+="0011"; break;
-          case '4': binary+="0100"; break;
-          case '5': binary+="0101"; break;
-          case '6': binary+="0110"; break;
-          case '7': binary+="0111"; break;
-          case '8': binary+="1000"; break;
-          case '9': binary+="1001"; break;
-          case 'A': binary+="1010"; break; case 'a': binary+="1010"; break;
-          case 'B': binary+="1011"; break; case 'b': binary+="1011"; break;
-          case 'C': binary+="1100"; break; case 'c': binary+="1100"; break;
-          case 'D': binary+="1101"; break; case 'd': binary+="1101"; break;
-          case 'E': binary+="1110"; break; case 'e': binary+="1110"; break;
-          case 'F': binary+="1111"; break; case 'f': binary+="1111"; break;
-          default:
-           binary+=hex[i]; break;
-        }
-  }
-  return binary;
+int main(int argc, char *argv[]){
+  init();
+  if(argc==2) input(argv[1]);
+  else        input();
+  pass1();
+  pass2();
+  std::cout<<std::endl;
+  return 0;
 }
 
 struct mnemonic{//MOT Table format
-  string name;
+  std::string name;
   int    size;
-  string opcode;
-  string format;
-}mot[13];
+  std::string opcode;
+  std::string format;
+}mot[25];
 
 struct psuedocode{//POT Table format
-	string name;
+	std::string name;
 	int    size;
 }pot[9];
 
 struct symbol{ //Symbol Table format
-	string name;
-	string type;
+	std::string name;
+	std::string type;
 	int location;
 	int size;
 	int section_id;
-	string is_global;
+	std::string is_global;
 };
 
 struct section{ //Section Table format
 	int id;
-	string name;
+	std::string name;
 	int size;
+  int loc;
 };
 
 
+std::string toString(int i);
+std::string toHex(int i);
+std::string toHex(int i, int bytes);
+std::string toBin(std::string hex);
+bool replace(std::string& str,
+     const std::string& from, const std::string& to);
 
-
-
-vector<symbol> symlab; //Symbol Table
-vector<section> sec; //Section Table
-
+int c  = 0; //line number of parsing
 int lc = 0; //Controls Location Counter
 int sec_id = 0; //Manage section Id
 int var_lc; //Store location of variable in Pass2
-ifstream infile; //Input File Stream
-ofstream inpfile; //Output file stream
-ofstream outfile; //Output File Stream
-ofstream objhexfile;
-ofstream objbinfile;
-string word; //Read Word by Word from file
-string temp; //Temporary Variable
+std::ifstream infile; //Input File Stream
+std::ofstream inpfile; //Output file stream
+std::ofstream outfile; //Output File Stream
+std::ofstream objhexfile;
+std::ofstream objbinfile;
+std::string word; //Read Word by Word from file
+std::string temp; //Temporary Variable
 mnemonic control;
 int size;  //Control Variable for search
-unordered_map<string, mnemonic  > MOT;
-unordered_map<string, psuedocode> POT;
+unordered_map<std::string, mnemonic  > MOT;
+unordered_map<std::string, psuedocode> POT;
+vector<symbol> symlab; //Symbol Table
+vector<section> sec; //Section Table
+
 
 
 void init()
 {
 	//Initializing Machine Opcode Table
-  //       Mnemonic Size Opcode Format
-  mot[ 0] = {"ADD",  1, "01", "{R}"  };
-	mot[ 1] = {"ADDI", 5, "02", "{C}"  };
-	mot[ 2] = {"CMP",  5, "03", "{R,C}"};
-	mot[ 3] = {"INC",  1, "04", "{R}"  };
-	mot[ 4] = {"JE",   5, "05", "{C}"  };
-	mot[ 5] = {"JMP",  5, "06", "{C}"  };
-	mot[ 6] = {"LOAD", 5, "07", "{C}"  };
-	mot[ 7] = {"LOADI",1, "08", "{}"   };
-	mot[ 8] = {"MVI",  5, "09", "{R,C}"};
-	mot[ 9] = {"MOV",  1, "0A", "{R,R}"};
-	mot[10] = {"STOP", 1, "0B", "{}"   };
-	mot[11] = {"STORE",5, "0C", "{C}"  };
-	mot[12] = {"STORI",1, "0D", "{}"  };
+  //         Mnemonic Size Opcode OperandFormat
+  mot[ 0] = {"MVI A",  5, "00", "{R,C}"};
+	mot[ 1] = {"MVI B",  5, "01", "{R,C}"};
+	mot[ 2] = {"MVI C",  5, "02", "{R,C}"};
+	mot[ 3] = {"MVI I",  5, "03", "{R,C}"};
+	mot[ 4] = {"LOAD",   5, "04", "{C}"  };
+	mot[ 5] = {"STORE",  5, "05", "{C}"  };
+	mot[ 6] = {"LOADI",  1, "06", "{}"   };
+	mot[ 7] = {"STORI",  1, "07", "{}"   };
+	mot[ 8] = {"ADD B",  1, "08", "{R}"  };
+	mot[ 9] = {"ADD C",  1, "09", "{R}"  };
+	mot[10] = {"MOV A,B",1, "0A", "{R,R}"};
+	mot[11] = {"MOV A,C",1, "0B", "{R,R}"};
+	mot[12] = {"MOV B,C",1, "0C", "{R,R}"};
+	mot[13] = {"MOV B,A",1, "0D", "{R,R}"};
+	mot[14] = {"MOV C,A",1, "0E", "{R,R}"};
+	mot[15] = {"MOV C,B",1, "0F", "{R,R}"};
+	mot[16] = {"INC A",  1, "10", "{R}"  };
+	mot[17] = {"INC B",  1, "11", "{R}"  };
+	mot[18] = {"INC C",  1, "12", "{R}"  };
+	mot[19] = {"CMP A",  1, "13", "{R}"  };
+	mot[20] = {"CMP B",  1, "14", "{R}"  };
+	mot[21] = {"CMP C",  1, "15", "{R}"  };
+	mot[22] = {"ADDI",   5, "16", "{C}"  };
+	mot[23] = {"JE",     5, "17", "{C}"  };
+	mot[24] = {"STOP",   1, "18", "{}"   };
 
 	//Initializing pot Table
 	pot[0] = {"dw",   2};//Define Word
@@ -140,14 +122,19 @@ void init()
 	pot[7] = {"resq", 8};//Reserve double Precision
 	pot[8] = {"rest", 9};//Reserve extended Precision
 
-  for(int i=0; i<13; i++)
+  for(int i=0; i<25; i++)
     MOT[mot[i].name]=mot[i];
 
-  for(int i=0; i<10; i++)
+  for(int i=0; i<9; i++)
    POT[pot[i].name]=pot[i];
-
 }
 
+bool is_number(const std::string& s)
+{
+    std::string::const_iterator it = s.begin();
+    while (it != s.end() && std::isdigit(*it)) ++it;
+    return !s.empty() && it == s.end();
+}
 
 int search_symbol(string variable) //Find Location of the Given Symbol
 {
@@ -168,12 +155,13 @@ int size_evaluation(string data, int bytes=4) //Evaluate size of Variable define
 	int size = 0;
 	for(int i = 0;i < data.length();i++)
 	{
-		if(data[i] == ',')
+		if(data[i] == ',' || data[i] == ' ' || data[i] == '\n')
 			size += bytes;
 	}
-	//size += 4;
+	size += bytes;
 	return size;
 }
+
 
 string data_break(string data, int bytes) //Convert String of Input Number into Binary String
 {
@@ -181,7 +169,7 @@ string data_break(string data, int bytes) //Convert String of Input Number into 
 	string temporary = "";
 	for(int i = 0;i < data.length();i++)
 	{
-		if(data[i] == ',')
+		if(data[i] == ',' || data[i] == ' ' || data[i] == '\n')
 		{
 			final = final+toHex(atoi(temporary.c_str()), bytes)+" ";
 			temporary = "";
@@ -195,13 +183,13 @@ string data_break(string data, int bytes) //Convert String of Input Number into 
 
 int decode_register(string word){
   if(word[0]=='A')
-   return 0;
-  else if(word[0]=='B')
    return 1;
-  else if(word[0] == 'C')
+  else if(word[0]=='B')
    return 2;
-  else if(word[0] == 'I')
+  else if(word[0] == 'C')
    return 3;
+  else if(word[0] == 'I')
+   return 4;
   return -1;
 }
 
@@ -210,8 +198,8 @@ void store_symlab() //Storing Symbol Table in File
   cout<<"\n\nSYMBOL TABLE\n-----------------------"<<endl;
 	outfile.open("symbol.csv");
 	outfile << "Name,Type,Location,Size,SectionID,IsGlobal\n";
-  cout<<setw(8)<<"Name "<<setw(8)<<"Type "<<setw(9)<<"Location"<<setw(4)<<" Size "<<setw(10)<<"SectionID ";
-  cout<<setw(8)<<"IsGlobal"<<"\n";
+  cout<<setw(8)<<"Name "<<setw(8)<<"Type"<<setw(9)<<"   Location"<<setw(4)<<"   Size "<<setw(10)<<" SectionID";
+  cout<<setw(8)<<"  IsGlobal"<<"\n";
 	for(vector<symbol>::const_iterator i = symlab.begin();i != symlab.end();++i)
 	{
 		outfile << i->name<<",";       cout <<setw(8)<< i->name<<" ";
@@ -235,12 +223,13 @@ void store_sec() //Storing Section Table in File
   cout<<"\n\nSECTION TABLE\n-----------------------\n";
 	outfile.open("section.csv");
 	outfile << "ID,Name,Size\n";
-  cout<<setw(4)<<"ID"<<setw(8)<<"Name"<<setw(5)<<"Size"<<"\n";
+  cout<<setw(4)<<"ID"<<setw(8)<<"Name"<<setw(5)<<"Size"<<setw(5)<<"    Pointer to content\n";
 	for(vector<section>::const_iterator i = sec.begin();i != sec.end();++i)
 	{
-		outfile << i->id<<",";     cout<<setw(4)<<i->id<<" ";
-		outfile << i->name<<",";   cout<<setw(8)<<i->name<<" ";
-		outfile << i->size<<"\n";  cout<<setw(5)<<i->size<<"\n";
+		outfile << i->id  <<",";     cout<<setw(4)<<i->id  <<" ";
+		outfile << i->name<<",";     cout<<setw(8)<<i->name<<" ";
+		outfile << i->size<<",";     cout<<setw(5)<<i->size<<" ";
+    outfile << i->loc <<"\n";    cout<<setw(5)<<i->loc <<"\n";
 	}
 	outfile.close();
 }
@@ -257,7 +246,8 @@ void display_file(string filename){
 }
 
 
-void input(){
+void input(string file){
+  if(file!="")
   cout<<"--------------------------------------------------------\n";
   cout<<"                WELCOME TO MY_ASSEMBLER\n";
   cout<<"--------------------------------------------------------\n";
@@ -279,8 +269,12 @@ void input(){
     //ch is 2
     int n=0;
     string line;
-    cout<<"Enter the filename: ";
-    cin>>line;
+    if(file==""){
+      cout<<"Enter the filename: ";
+      cin>>line;
+    }else{
+      line = file;
+    }
     ifstream inputfile;
     inputfile.open(line);
     inpfile.open("input.txt");
@@ -296,197 +290,304 @@ void input(){
 
 }
 
-void pass1()
-{
-	infile.open("input.txt");
-	while(infile >> word)
-	{
-    //cout<<"processing word "<<word<<endl; //debug
-		if(MOT.find(word)==MOT.end())
-		{
-			temp = word;
-			if(word.find(":") != -1)//Label is Found
-			{
-				symlab.push_back({temp.erase(word.length()-1,1),"label",lc,-1,sec_id,"false"}); //Inserting into Symbol Table
-			}
-			else if(word == "section")//Section is Found
-			{
-				infile >> word;
-				sec_id++;
-				sec.push_back({sec_id,word,0}); //Inserting into Section Table
-				if(sec_id != 1) // Updating previous section Size
-				{
-					sec[sec_id-2].size = lc;
-					lc = 0;
-				}
-			}
-			else if(word == "global") //Global Varaible is Found
-			{
-				infile >> word;
-				symlab.push_back({word,"label",-1,-1,-1,"true"}); //Inserting into Symbol Table
-			}
-			else if(word == "extern") //External Variable is found
-			{
-				infile >> word;
-				symlab.push_back({word,"external",-1,-1,-1,"false"}); //Inserting into Symbol Table
-			}
-			else//Variable is Found
-			{
-				infile >> word;
-				infile >> word;
-				size = size_evaluation(word);
-				symlab.push_back({temp,"var",lc,size,sec_id,"false"}); //Inserting into Symbol Table
-				lc += size;
-			}
-		}
-		else
-		{
-      control = MOT[word];
-      //LOADI and STOREI do not have any paramenter
-			if(!(control.format=="{}" && control.name!="STOP"))
-				infile >> word;
-      //if(word=="MVI" || word=="MOV" || word == "CMP")
-			if(control.format=="{R,C}" || control.format=="{R,R}")
-				infile >> word;
-			lc += control.size;
-		}
-	}
 
-	sec[sec_id-1].size = lc; //Updating size of current Section
 
-	store_symlab();
-	store_sec();
+void pass1(){
+  std::ifstream file;
+  std::string str;
+  file.open("input.txt");
+  while (std::getline(file, str)) {
+    if(str=="")           //ignore blank line
+     continue;
+    str = str.substr(0, str.find(';')); //ignore comments
+    replace(str, ", ", ","); //remove space after comma
+    std::stringstream line(str);
+    std::string word;
+    line>>word;
 
-	infile.close();
+    if(word.find(":") != -1)//Declaration of Label is Found
+    {
+      //cout<<"label found "<<word<<endl;
+      symlab.push_back({word.erase(word.length()-1,1),"label",lc,-1,sec_id,"false"}); //Inserting into Symbol Table
+      line>>word;
+    }
+
+    temp = word;
+      //std::cout<<word<<"- ";
+      if(word == "section")//Section is Found
+  			{
+  				line >> word;
+  				sec_id++;
+  				sec.push_back({sec_id,word,0, c}); //Inserting into Section Table
+  				if(sec_id != 1) // Updating previous section Size
+  				{
+  					sec[sec_id-2].size = lc;
+  					lc = 0;
+  				}
+          if(line>>word)
+           std::cout<<"Error: unexpected identifier after section declaration, at line "<<c+1<<"\n"<<str;
+  			}
+  			else if(word == "global") //Global Varaible is Found
+  			{
+  				line >> word;
+  				symlab.push_back({word,"label",-1,-1,-1,"true"}); //Inserting into Symbol Table
+          if(line>>word)
+            std::cout<<"Error: unexpected identifier after extern declaration, at line "<<c+1<<"\n"<<str;
+  			}
+  			else if(word == "extern") //External Variable is found
+  			{
+  				line >> word;
+  				symlab.push_back({word,"external",-1,-1,-1,"false"}); //Inserting into Symbol Table
+          if(line>>word)
+            std::cout<<"Error: unexpected identifier after section declaration, at line "<<c+1<<"\n"<<str;
+  			}
+        else if(MOT.find(word)!=MOT.end()){
+            //cout<<word<<"found in MOT 1 "<<endl;
+            control = MOT[word];
+
+      			if(!(control.format=="{}" && control.name!="STOP"))
+      				line >> word;
+
+      			if(control.format=="{R,C}" || control.format=="{R,R}")
+      				line >> word;
+      			lc += control.size;
+            c  += control.size;
+        }
+        else
+        {
+              line>>word;
+              //cout<<temp<<" "<<word[0]<<"found in MOT 2"<<endl;
+              if(MOT.find(temp+" "+word[0])!=MOT.end()){
+                  control = MOT[temp+" "+word[0]];
+
+            			if(!(control.format=="{}" && control.name!="STOP"))
+            				line >> word;
+
+            			if(control.format=="{R,C}" || control.format=="{R,R}")
+            				line >> word;
+            			lc += control.size;
+                  c  += control.size;
+              }
+              else if(MOT.find(temp+" "+word)!=MOT.end()){
+                  control = MOT[temp+" "+word];
+
+            			if(!(control.format=="{}" && control.name!="STOP"))
+            				line >> word;
+
+            			if(control.format=="{R,C}" || control.format=="{R,R}")
+            				line >> word;
+            			lc += control.size;
+                  c  += control.size;
+              }
+             else{
+                  int bytes = 4;
+                  if(POT.find(word)!=POT.end())
+                    bytes = POT[word].size;
+                  //Variable is Found
+          				line >> word;
+                  size = size_evaluation(word, bytes);
+                  var_lc = search_symbol(temp);
+          				if(var_lc != -1){
+                    cout<<"redefination of already defined symbol, line "<<c+1<<"\n"<<str;
+                    return;
+                  }
+                  //cout<<temp<<"not found in MOT 3 jai gau mata"<<endl;
+          				symlab.push_back({temp,"var",lc,size,sec_id,"false"}); //Inserting into Symbol Table
+          				lc += size;
+                  c  += size;
+          			}
+            }
+
+    //std::cout<<std::endl;
+  }
+  sec[sec_id-1].size = lc; //Updating size of current Section
+
+  store_symlab();
+  store_sec();
+  file.close();
 }
 
-void pass2()
-{
-	infile.open("input.txt");
-	objhexfile.open("outputhex.txt");
-  objbinfile.open("outputbin.txt");
-	while(infile >> word)
-	{
-    //cout<<"Processing the word "<<word<<endl;
-    //char ch; cin>>ch;
-		if(MOT.find(word)==MOT.end())
-		{
-      //cout<<word<<" not in machine opcode table"<<endl;
-			temp = word;
-			if(word.find(":") != -1) //No Machine Code for Label
- 			{
- 				objhexfile << "";
-        objbinfile << "";
-			}
-			else if(word == "global") //No change in Global content
-			{
-				infile >> word;
-				objhexfile <<"global "<<word<<endl;
-        objbinfile <<"global "<<word<<endl;
-			}
-			else if(word == "extern") //No change in External Content
-			{
-				infile >> word;
-				objhexfile <<"extern "<<word<<endl;
-        objbinfile <<"extern "<<word<<endl;
-			}
-			else if(word == "section") //No change in Section content
-			{
-				infile >> word;
-				objhexfile <<"section ."<<word<<endl;
-        objbinfile <<"section ."<<word<<endl;
-				lc = 0;
-			}
-			else //Variables are converted to hex along with the values
-			{
-				infile >> word;
-        int bytes = 0;
-        if(!(POT.find(word)==POT.end())){
-          bytes = POT[word].size;
-        }
-				infile >> word;
-				objhexfile <<toHex(lc)       <<" "<<data_break(word, bytes)       <<endl;
-        objbinfile <<toBin(toHex(lc))<<" "<<toBin(data_break(word, bytes))<<endl;
-				size = size_evaluation(word, bytes);
-				lc += size;
-			}
-		}
-		else
-		{
-      mnemonic control = MOT[word];
-			objhexfile <<toHex(lc)       <<" "<<control.opcode;
-      objbinfile <<toBin(toHex(lc))<<" "<<toBin(control.opcode);
-			//if(word=="ADD"||word=="INC") //ADD and INC have defined register following it
-      if(control.format=="{R}")
-			{
-				infile >> word;
-        word=toHex(decode_register(word), 2);
-				objhexfile <<" "<<word;
-        objbinfile <<" "<<toBin(word);
-			}
-			//else if(word=="ADDI" || word=="JE" || word=="JMP" || word=="LOAD" || word=="STORE") //ADDI, JE, JMP, LOAD and STORE have one constant following it
-      else if(control.format=="{C}")
-			{
-				infile >> word;
-				var_lc = search_symbol(word);
-				if(var_lc == -1){
-          objhexfile <<" "<<toHex(atoi(word.c_str()), 2);
-          objbinfile <<" "<<toBin(toHex(atoi(word.c_str()), 2));
-        }
-				else{
-          objhexfile <<" "<<toHex(var_lc);
-          objbinfile <<" "<<toBin(toHex(var_lc));
-        }
-			}
-			//else if(word=="CMP" || word=="MVI") //CMP and MVI have one register and one constant following it
-      else if(control.format=="{R,C}")
-			{
+void pass2(){
+  infile.open("input.txt");
+  string str;
+  objhexfile.open("outputhex.txt");
+  while(std::getline(infile, str)){
+    if(str=="")           //ignore blank line
+     continue;
+    str = str.substr(0, str.find(';')); //ignore comments
+    replace(str, ", ", ","); //remove space after comma
+    std::stringstream line(str);
+    std::string word;
+    line>>word;
+    temp = word;
 
-				infile >> word;
-        word=toHex(decode_register(word), 2);
-        //cout<<"reached here "<<word<<endl;
-				objhexfile <<" "<<word;
-        objbinfile <<" "<<toBin(word);
-				infile >> word;
-				var_lc = search_symbol(word);
-				if(var_lc == -1){
-          objhexfile <<" "<<toHex(atoi(word.c_str()), 2);
-          objbinfile <<" "<<toBin(toHex(atoi(word.c_str()), 2));
+    if(word.find(":") != -1 ||
+                word == "global"|| word == "extern"){
+                  continue;
+                  c++;
+                }
+    if(word == "section") //No change in Section content
+    {
+        infile >> word;
+        lc = 0;
+        c++;
+        continue;
+    }
+
+    mnemonic control;
+
+    if(MOT.find(word)!=MOT.end()){
+        control = MOT[word];
+        cout <<toHex(lc, 2)       <<"| "<<control.opcode;
+        objhexfile <<control.opcode <<" ";
+        lc += control.size;
+        c  += control.size;
+
+        if(control.format=="{C}"){
+          line>>word;
+          string operand = word;
+          var_lc = search_symbol(operand);
+          if(var_lc == -1){
+            if(is_number(operand)){
+              objhexfile <<toHex(atoi(operand.c_str()), 2)<<" ";
+                    cout <<toHex(atoi(operand.c_str()), 2)<<" ";
+            }else{
+              cout<<"Error, symbol "<<operand<<" not found in symbol table "<<endl;
+            }
+          }
+          else{
+            objhexfile <<" "<<toHex(var_lc, 2);
+            objbinfile <<" "<<toBin(toHex(var_lc, 2));
+          }
+          if(line>>word)
+            std::cout<<"Error: unexpected identifier "<<word<<" after operand, at line "<<c+1<<"\n"<<str;
         }
-				else{
-          objhexfile <<" "<<toHex(var_lc, 2);
-          objbinfile <<" "<<toBin(toHex(var_lc, 2));
+        else if(control.format=="{}"){
+          if(line>>word)
+            std::cout<<"Error: unexpected identifier "<<word<<" after opcode, at line "<<c+1<<"\n"<<str;
         }
-			}
-			//else if(word == "MOV") //MOV have both registers following it
-      else if(control.format=="{R,R}")
-			{
-				infile >> word;
-        word=toHex(decode_register(word), 2);
-        objhexfile <<" "<<word;
-        objbinfile <<" "<<toBin(word);
-				infile >> word;
-        word=toHex(decode_register(word), 2);
-				objhexfile <<" "<<word;
-        objbinfile <<" "<<toBin(word);
-			}
-			lc += control.size;
-			objhexfile << "\n";
-      objbinfile << "\n";
-		}
-	}
-	objhexfile.close();
-  objbinfile.close();
-	infile.close();
-  display_file("outputhex.txt");
+    }
+    else
+    {
+        line>>word;
+        if(MOT.find(temp+" "+word)!=MOT.end()){
+          control = MOT[temp+" "+word];
+                cout <<toHex(lc, 2)       <<"| "<<control.opcode;
+          objhexfile <<control.opcode <<" ";
+          lc += control.size;
+
+          if(control.format=="{R,C}"){
+            string operand = word.substr(str.find(',')+1, str.size());
+            var_lc = search_symbol(operand);
+            if(var_lc == -1){
+              if(is_number(operand)){
+                objhexfile <<toHex(atoi(operand.c_str()), 2)<<" ";
+                      cout <<toHex(atoi(operand.c_str()), 2)<<" ";
+              }else{
+                cout<<"Error, symbol "<<operand<<" not found in symbol table "<<endl;
+              }
+            }
+            else if(control.format=="{R,R}" || control.format=="{R}"){
+              if(line>>word)
+                std::cout<<"Error: unexpected identifier "<<word<<" after operand, at line "<<c+1<<"\n"<<str;
+            }
+        }
+        else if(MOT.find(temp+" "+word)!=MOT.end()){
+          control = MOT[temp+" "+word[0]];
+                cout <<toHex(lc, 2)       <<"| "<<control.opcode;
+          objhexfile <<control.opcode <<" ";
+          lc += control.size;
+
+          if(control.format=="{R,C}"){
+            string operand = word.substr(str.find(',')+1, str.size());
+            var_lc = search_symbol(operand);
+            if(var_lc == -1){
+                  if(is_number(operand)){
+                    objhexfile <<toHex(atoi(operand.c_str()), 2)<<" ";
+                          cout <<toHex(atoi(operand.c_str()), 2)<<" ";
+                  }else{
+                    cout<<"Error, symbol "<<operand<<" not found in symbol table "<<endl;
+                  }
+            }
+          else{
+              objhexfile <<" "<<toHex(var_lc, 2);
+              objbinfile <<" "<<toBin(toHex(var_lc, 2));
+          }
+          if(line>>word)
+              std::cout<<"Error: unexpected identifier "<<word<<" after operand, at line "<<c+1<<"\n"<<str;
+          }
+          else if(control.format=="{R}"){
+            if(line>>word)
+              std::cout<<"Error: unexpected identifier "<<word<<" after opcode, at line "<<c+1<<"\n"<<str;
+          }
+
+       }else{
+         infile >> word;
+         int bytes = 0;
+         if(!(POT.find(word)==POT.end()))
+           bytes = POT[word].size;
+         else
+             cout<<"Error psuedocode symbol not found"<<endl;
+ 				infile >> word;
+ 				objhexfile <<toHex(lc,2)       <<"| "<<data_break(word, bytes)       <<endl;
+         objbinfile <<toBin(toHex(lc,2))<<"| "<<toBin(data_break(word, bytes))<<endl;
+ 				size = size_evaluation(word, bytes);
+ 				lc += size;
+       }
+    }
+   }
+
+    cout<< endl;
+  }
 }
 
 
-int main(){
-  init();
-  input();
-  pass1();
-  pass2();
-  cout<<endl;
-  return 0;
+std::string toString(int i){
+    std::stringstream ss;
+    ss << i;
+    return ss.str();
+}
+
+
+std::string toHex(int i){
+    std::stringstream ss;
+    ss << std::hex << i;
+    std::string s = ss.str();
+    if(s.size()==1) s="0"+s;
+    return s;
+}
+
+std::string toHex(int i, int bytes){
+  if(bytes<0){
+    std::cout<<"invalid size, not comparable"<<std::endl;
+    return "\0";
+  }
+  if(bytes==0) bytes=1;
+    std::stringstream ss;
+    ss << std::hex << i;
+    std::string s = ss.str();
+    while(s.length()!=2*bytes)
+      s="0"+s;
+    return s;
+}
+
+std::string toBin(std::string hex){
+  std::string binary="";
+  for(int i=0; i<hex.size(); i++){
+        switch (hex[i]) {
+          case '0': binary+="0000"; break; case '1': binary+="0001"; break; case '2': binary+="0010"; break; case '3': binary+="0011"; break;
+          case '4': binary+="0100"; break; case '5': binary+="0101"; break; case '6': binary+="0110"; break; case '7': binary+="0111"; break;
+          case '8': binary+="1000"; break; case '9': binary+="1001"; break; case 'A': binary+="1010"; break; case 'a': binary+="1010"; break;
+          case 'B': binary+="1011"; break; case 'b': binary+="1011"; break; case 'C': binary+="1100"; break; case 'c': binary+="1100"; break;
+          case 'D': binary+="1101"; break; case 'd': binary+="1101"; break; case 'E': binary+="1110"; break; case 'e': binary+="1110"; break;
+          case 'F': binary+="1111"; break; case 'f': binary+="1111"; break;  default: binary+=hex[i]; break;
+        }
+  }
+  return binary;
+}
+
+bool replace(std::string& str, const std::string& from, const std::string& to) {
+    while(str.find(from) != std::string::npos)
+     str.replace(str.find(from), from.length(), to);
+    return true;
 }

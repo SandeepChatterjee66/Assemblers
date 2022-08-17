@@ -1,2 +1,2 @@
 # Assemblers
-implimenting naive assemblers in c++
+implementing naive assemblers in c++

@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <iomanip>
 
+#include "util.h"
+
 using namespace std;
 
 void init();
